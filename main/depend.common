@@ -96,7 +96,8 @@ module_io.o :	md_calls.inc \
 		module_state_description.o \
 		module_configure.o  \
                 module_streams.o \
-		module_driver_constants.o 
+		module_driver_constants.o \
+		/home/omar/WORK/codes/MUI/MUI_2.0/wrappers/Fortran/mui_f_wrapper_3d.o
 
 module_io_quilt.o: \
 		module_state_description.o \
@@ -145,14 +146,17 @@ module_cpl.o: \
 		module_driver_constants.o \
 		module_domain.o \
 		module_configure.o \
-		module_cpl_oasis3.o
+		module_cpl_oasis3.o \
+		module_cpl_mui.o
 
 module_cpl_oasis3.o: module_driver_constants.o \
                      module_domain.o
 
 module_clear_halos.o: module_configure.o \
                      module_domain.o
-
+module_cpl_mui.o: module_driver_constants.o \
+                     module_domain.o \
+		     $(MUI_PATH)/wrappers/Fortran/mui_f_wrapper_3d.o
 # End of DEPENDENCIES for frame
 
 # DEPENDENCIES for phys

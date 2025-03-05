@@ -5,6 +5,7 @@ MODULE module_cpl
    USE module_model_constants , ONLY : stbolt
    USE module_driver_constants, ONLY : max_domains, max_cplfld, max_extdomains
    USE module_cpl_oasis3 
+   USE module_cpl_mui
 
    IMPLICIT NONE
    PRIVATE
@@ -21,10 +22,13 @@ MODULE module_cpl
 
 #ifdef key_cpp_oasis3
    LOGICAL     , PARAMETER, PUBLIC :: coupler_on = .TRUE.
-   CHARACTER(5), PARAMETER         :: coupler_name = 'oasis'
+   CHARACTER(5), PARAMETER, PUBLIC :: coupler_name = 'oasis'
+#elif key_cpp_mui
+   LOGICAL     , PARAMETER, PUBLIC :: coupler_on = .TRUE.
+   CHARACTER(5), PARAMETER, PUBLIC :: coupler_name = 'mui'
 #else
    LOGICAL     , PARAMETER, PUBLIC :: coupler_on = .FALSE.
-   CHARACTER(4), PARAMETER         :: coupler_name = 'none'
+   CHARACTER(4), PARAMETER, PUBLIC :: coupler_name = 'none'
 #endif
    INTEGER :: nsecrun             ! current time in seconds since simulation restart
    INTEGER, PARAMETER :: charlen = 64
@@ -88,6 +92,7 @@ CONTAINS
       END DO
       
       IF ( coupler_name == 'oasis' ) CALL cpl_oasis_init( kl_comm ) 
+      IF ( coupler_name == 'mui' ) CALL cpl_mui_init( kl_comm ) 
       
    END SUBROUTINE cpl_init
    
@@ -280,27 +285,84 @@ CONTAINS
       INTEGER :: ips,ipe,jps,jpe,kps,kpe ! domain dimension on 1 processor
       INTEGER :: ims,ime,jms,jme,kms,kme ! memory domain dimension on 1 processor 
       INTEGER :: ids,ide,jds,jde,kds,kde ! domain dimension
+      character(len=50) :: arg
       !!--------------------------------------------------------------------
       CALL get_ijk_from_grid( grid, ids, ide, jds, jde, kds, kde, &
          &                          ims, ime, jms, jme, kms, kme, &
          &                          ips, ipe, jps, jpe, kps, kpe  )
 
 #if (EM_CORE == 1)
-      CALL cpl_snd2( grid, grid%num_ext_model_couple_dom,   &
+      IF (coupler_name == 'oasis') then
+         CALL cpl_snd_oasis( grid, grid%num_ext_model_couple_dom,   &
          &                 ids, ide, jds, jde, kds, kde,    &
          &                 ims, ime, jms, jme, kms, kme,    &
          &                 ips, ipe, jps, jpe, kps, kpe )
+      elseif (coupler_name == 'mui') then
+         call get_command_argument(1, arg)
+
+      ! Trim the argument and check if it is equal to "mui_coupled"
+         if (trim(arg) == "mui_coupled") then
+            CALL cpl_snd_mui( grid, grid%num_ext_model_couple_dom,   &
+            &                 ids, ide, jds, jde, kds, kde,    &
+            &                 ims, ime, jms, jme, kms, kme,    &
+            &                 ips, ipe, jps, jpe, kps, kpe )
+         endif
+      endif
+               
+      
 #endif
 
    END SUBROUTINE cpl_snd
 
 
-   SUBROUTINE cpl_snd2( grid, max_edom                &
+   SUBROUTINE cpl_snd_mui( grid, max_edom                &
       &                     , ids,ide,jds,jde,kds,kde &
       &                     , ims,ime,jms,jme,kms,kme &
       &                     , ips,ipe,jps,jpe,kps,kpe )
       !!-------------------------------------------------------------------
-      !!             ***  SUBROUTINE cpl_snd2  ***
+      !!             ***  SUBROUTINE cpl_snd_mui  ***
+      !!
+      !! ** Purpose : compute coupling data to be sent and call cpl_sndfield
+      !!--------------------------------------------------------------------
+     
+      TYPE(domain), INTENT(IN), POINTER :: grid
+      INTEGER,      INTENT(IN)          :: max_edom    ! max number of external model domains
+      INTEGER,      INTENT(IN)          :: ids,ide,jds,jde,kds,kde
+      INTEGER,      INTENT(IN)          :: ims,ime,jms,jme,kms,kme
+      INTEGER,      INTENT(IN)          :: ips,ipe,jps,jpe,kps,kpe
+      !
+      REAL, DIMENSION( ips:ipe, jps:jpe ) :: cplsnd
+      REAL, DIMENSION( ips:ipe, jps:jpe ) :: u_uo
+      REAL, DIMENSION( ips:ipe, jps:jpe ) :: v_vo
+      REAL, DIMENSION( ips:ipe, jps:jpe ) :: wspd
+      REAL, DIMENSION( ips:ipe, jps:jpe ) :: taut
+      INTEGER :: icnt, i,j,k
+      INTEGER :: ifldid
+      LOGICAL,DIMENSION(max_edom) :: lltosend
+
+      CALL cpl_mui_snd( grid, max_edom                &
+      &                     , ids,ide,jds,jde,kds,kde &
+      &                     , ims,ime,jms,jme,kms,kme &
+      &                     , ips,ipe,jps,jpe,kps,kpe, nsecrun)
+
+      ! CALL cpl_sndfield( grid%id, lltosend, ifldid, taut )
+
+      ! ifldid      = cpl_get_fldid( 'va' )
+      ! lltosend(:) = cpl_tosend( grid%id, ifldid, max_edom )
+      ! IF ( COUNT(lltosend) > 0 ) THEN 
+      !    write(*,*) "va va va va va va va va",grid%id, ifldid, max_edom , grid%u_gc(1,j,k), grid%v_gc(1,j,k)
+         ! CALL cpl_sndfield( grid%id, lltosend, ifldid, taut )
+      ! END IF
+
+      
+   END SUBROUTINE cpl_snd_mui
+
+   SUBROUTINE cpl_snd_oasis( grid, max_edom                &
+      &                     , ids,ide,jds,jde,kds,kde &
+      &                     , ims,ime,jms,jme,kms,kme &
+      &                     , ips,ipe,jps,jpe,kps,kpe )
+      !!-------------------------------------------------------------------
+      !!             ***  SUBROUTINE cpl_snd_oasis  ***
       !!
       !! ** Purpose : compute coupling data to be sent and call cpl_sndfield
       !!--------------------------------------------------------------------
@@ -379,7 +441,8 @@ CONTAINS
       END IF
       
 #endif       
-   END SUBROUTINE cpl_snd2
+   END SUBROUTINE cpl_snd_oasis
+
 
 
    SUBROUTINE cpl_sndfield( kdomwrf, ldtosend, kfldid, pdata )

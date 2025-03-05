@@ -77,7 +77,7 @@ SUBROUTINE solve_em ( grid , config_flags  &
    USE module_after_all_rk_steps
    USE module_llxy, ONLY : proj_cassini
    USE module_avgflx_em, ONLY : zero_avgflx, upd_avgflx
-   USE module_cpl, ONLY : coupler_on, cpl_settime, cpl_store_input
+   USE module_cpl, ONLY : coupler_on, cpl_settime, cpl_store_input,coupler_name
 
 #if (WRF_CMAQ == 1)
    use twoway_data_module

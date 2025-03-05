@@ -33,6 +33,7 @@ MODULES =       module_driver_constants.o  \
                 module_io_quilt.o          \
 		module_cpl.o               \
 		module_cpl_oasis3.o        \
+                module_cpl_mui.o        \
 		module_clear_halos.o
 ALOBJS =\
                 module_alloc_space_0.o       \
